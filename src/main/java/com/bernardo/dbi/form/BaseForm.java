@@ -15,7 +15,7 @@ public class BaseForm {
     public class FormMastery {
         private float exp = 0.0f; // experiência acumulada
         private float level; // 0.0 to 50.0
-        private static final float EXP_PER_LEVEL = 50.0f;
+        private static final float EXP_PER_LEVEL = 100f;
 
         public FormMastery() {
             this.level = 0.0f;
@@ -36,20 +36,14 @@ public class BaseForm {
             return this.level;
         }
 
-        public void setLevel(float newLevel) {
-            if (newLevel >= 0.0f && newLevel <= 50.0f) {
-                this.level = newLevel;
-                this.exp = newLevel * EXP_PER_LEVEL;
-            }
-        }
-
         public float getExp() {
             return this.exp;
         }
 
         public float getExpToNextLevel() {
-            if (level >= 50.0f) return 0.0f;
-            return (level + 1) * EXP_PER_LEVEL - exp;
+            if (level >= 50.0f) return 0f;
+            float nextLevelExp = ((int) level + 1) * EXP_PER_LEVEL;
+            return nextLevelExp - exp;
         }
     }
 }

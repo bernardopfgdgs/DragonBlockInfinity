@@ -7,6 +7,6 @@ public class Status {
         CON,
         WILL,
         MND,
-        SPI,
+        SPI
     }
 }

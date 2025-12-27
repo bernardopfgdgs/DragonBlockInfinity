@@ -4,6 +4,7 @@ import com.bernardo.dbi.race.RaceRegistry;
 import com.bernardo.dbi.network.ModNetwork;
 import com.bernardo.dbi.capability.PlayerRaceCap;
 import com.bernardo.dbi.capability.PlayerStatusCap;
+import com.bernardo.dbi.style.StyleRegistry;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
@@ -14,6 +15,9 @@ public class ModRegister {
 
         // Registrar raças
         RaceRegistry.registerAll();
+
+        // Registrar estilos de luta
+        StyleRegistry.registerAll();
 
         // Registrar rede
         ModNetwork.register(modEventBus);
