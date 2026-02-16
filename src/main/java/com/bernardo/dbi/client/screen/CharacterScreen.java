@@ -1,377 +1,478 @@
 package com.bernardo.dbi.client.screen;
 
 import com.bernardo.dbi.Dbi;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.bernardo.dbi.network.ModNetwork;
+import com.bernardo.dbi.network.packet.RaceSelectionPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.server.packs.resources.Resource;
-import java.util.Optional;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
-import java.util.HashMap;
-import java.util.Map;
-import net.minecraft.client.Minecraft;
-
 /**
- * Tela de criação/seleção de personagem (esqueleto).
+ * CharacterScreen — tela completa de aparência.
  *
- * Comporta: leitura de coordenadas de botões de `icons.btn`, área de pré-visualização
- * e hooks para persistência da raça selecionada.
+ * Integrado com:
+ *  - Raças reais do RaceRegistry (Sayajin, Namekian, Arconsian, Humano, Half_Sayajin)
+ *  - Texturas reais: textures/entity/race/<id>.png
+ *  - Cabelos reais: textures/entity/customizacao/hair/hair_base<N>.png
+ *  - Envia RaceSelectionPacket ao servidor ao confirmar
+ *  - Salva no NBT do player (dbi:race, dbi:bodyColor, etc.)
+ *
+ * UI:
+ *  [Aparência]         [<< RaçaNome >>]
+ *  ┌──────────┐        [<< Forma      >>]   (se raça tiver)
+ *  │ Preview  │        [<< Cabelo     >>]   (se raça tiver)
+ *  │ 2D       │           [■ cor cabelo]
+ *  │          │        [<< Adulto     >>]
+ *  └──────────┘        [<< Tipo Corpo >>]
+ *                         [■][■][■] cores
+ *                      [<< Nariz N    >>]
+ *                      [<< Boca  N    >>]
+ *                      [<< Olhos N    >>]
+ *                         [■][■] cores olhos
+ *                         [ Igualar   ]
+ *  [X]                              [Próx]
  */
 public class CharacterScreen extends Screen {
 
-    private final ResourceLocation background = new ResourceLocation(Dbi.MOD_ID, "textures/gui/menu.png");
-    private final Map<String, int[]> buttonCoords = new HashMap<>();
-    private ResourceLocation selectedTexture = null;
-    // GUI size calculated from background PNG
-    private int guiWidth = 512;
-    private int guiHeight = 512;
-    private int leftPos = 0;
-    private int topPos = 0;
+    // =========================================================
+    //  RAÇAS — espelha Race.RaceType do projeto
+    // =========================================================
 
-    // preview area (relative to gui top-left)
-    private int previewX = 200;
-    private int previewY = 100;
-    private int previewW = 200;
-    private int previewH = 350;
+    private static final String[][] RACE_DEFS = {
+        // { id_textura, nome_exibido, tem_forma, tem_cabelo, max_body, max_nose, max_mouth, max_eyes, hex_body, hex_hair, hex_eyes }
+        { "sayajin",      "Sayajin",      "true",  "true",  "3","3","3","3","0xFFD2956E","0xFF1A1A1A","0xFF1A1A1A" },
+        { "namekian",     "Namekian",     "false", "false", "2","2","2","2","0xFF3CB371","0xFF000000","0xFF000000" },
+        { "arconsian",    "Arcosian",     "true",  "false", "2","2","2","2","0xFFFFF0F5","0xFF000000","0xFFCC0000" },
+        { "humano",       "Humano",       "true",  "true",  "3","3","3","3","0xFFD2956E","0xFF7B4F2E","0xFF5B3A29" },
+        { "halfsayajin",  "Half-Sayajin", "true",  "true",  "3","3","3","3","0xFFD2956E","0xFF1A1A1A","0xFF1A1A1A" },
+    };
 
-    // UI state for top label and color picker
-    private String topLabel = "RACE";
-    private int skinColor = 0xFFE0B899;
-    private int hairColor = 0xFF6A492F;
-    private boolean showColorPicker = false;
-    private String colorTarget = null; // "skin" or "hair" or others
-    private int pickerX, pickerY, pickerW, pickerH, sliderX, sliderY, sliderW, sliderH;
-    private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
+    // Formas por raça (índice igual ao de RACE_DEFS)
+    private static final String[][] RACE_FORMS = {
+        { "Normal" },                                                              // Sayajin
+        { },                                                                       // Namekian
+        { "Forma Minima","Forma 1","Forma 2","Forma 3","Forma Final" },           // Arcosian
+        { "Normal" },                                                              // Humano
+        { "Normal" },                                                              // Half-Sayajin
+    };
+
+    // Estilos de cabelo disponíveis (hair_base1..6.png)
+    private static final int HAIR_STYLES = 6;
+
+    // =========================================================
+    //  ESTADO
+    // =========================================================
+
+    private int raceIdx      = 0;
+    private int formIdx      = 0;
+    private int hairStyle    = 0;  // 0..HAIR_STYLES-1
+    private int ageIdx       = 0;  // 0=Adulto 1=Criança
+    private int bodyTypeIdx  = 0;
+    private int noseIdx      = 0;
+    private int mouthIdx     = 0;
+    private int eyeIdx       = 0;
+
+    private int bodyColor;
+    private int hairColor;
+    private int eyeColor;
+
+    // Color picker
+    private boolean showPicker  = false;
+    private String  pickerTarget = null;
+    private static final int PW = 180, PH = 110, SW = 14;
+    private int px, py, sx, sy;
+    private float ph = 0, ps = 1, pv = 1;
+
+    // Layout
+    private int panX, panY, panW, panH;
+    private int prX, prY, prW, prH;
+    private int opX, opW;
+
+    // =========================================================
+    //  CTOR
+    // =========================================================
 
     public CharacterScreen() {
-        super(Component.literal("Character"));
+        super(Component.literal("Aparência"));
     }
+
+    // =========================================================
+    //  INIT
+    // =========================================================
 
     @Override
     protected void init() {
         super.init();
-        // determina tamanho da GUI a partir do PNG e posiciona centralizado
-        determineGuiSize();
-        loadButtonCoords();
+        panW = Math.min(660, width  - 40);
+        panH = Math.min(420, height - 40);
+        panX = (width  - panW) / 2;
+        panY = (height - panH) / 2;
+        prW  = panW * 36 / 100;
+        prH  = panH - 56;
+        prX  = panX + 8;
+        prY  = panY + 47;
+        opX  = prX + prW + 16;
+        opW  = panX + panW - opX - 8;
+        initColors();
+        build();
+    }
 
-        // Exemplo: criar botões a partir das coordenadas lidas (labels temporários)
-        // As coordenadas no arquivo devem estar no formato: id x y width height
-        for (Map.Entry<String, int[]> e : buttonCoords.entrySet()) {
-            String id = e.getKey();
-            int[] c = e.getValue();
-            if (c.length >= 4) {
-                // coords in icons.btn are relative to GUI top-left
-                this.addRenderableWidget(new DepressibleButton(this.leftPos + c[0], this.topPos + c[1], c[2], c[3], Component.literal(id), btn -> onButtonPressed(id)));
-            }
+    // =========================================================
+    //  BUILD DOS WIDGETS
+    // =========================================================
+
+    private void build() {
+        clearWidgets();
+        String[] r  = RACE_DEFS[raceIdx];
+        boolean forma  = "true".equals(r[2]);
+        boolean cabelo = "true".equals(r[3]);
+        int maxBody = Integer.parseInt(r[4]);
+        int maxNose = Integer.parseInt(r[5]);
+        int maxMouth= Integer.parseInt(r[6]);
+        int maxEye  = Integer.parseInt(r[7]);
+        int aw = 22, ah = 18, gap = 26;
+        int cy = panY + 52;
+
+        // Raça
+        arrow(opX,          panY+10, aw, ah, "<<", "race_p");
+        arrow(opX+opW-aw,   panY+10, aw, ah, ">>", "race_n");
+
+        // Forma
+        if (forma && RACE_FORMS[raceIdx].length > 0) {
+            arrow(opX,        cy, aw, ah, "<<", "form_p"); arrow(opX+opW-aw, cy, aw, ah, ">>", "form_n"); cy += gap;
         }
 
-        // botão seta esquerda (coordenadas fornecidas: x=0,y=0,w=20,h=19)
-        this.addRenderableWidget(new DepressibleButton(this.leftPos + 10, this.topPos + 10, 30, 25, Component.literal("<"), b -> onButtonPressed("arrow_left")));
-
-        // botão seta direita (coordenadas fornecidas: x=21,y=0,w=20,h=19)
-        this.addRenderableWidget(new DepressibleButton(this.leftPos + 475, this.topPos + 10, 30, 25, Component.literal(">"), b -> onButtonPressed("arrow_right")));
-
-        // botão confirmar ao final (usa DepressibleButton para compatibilidade)
-        int bw = 120;
-        int bh = 30;
-        this.addRenderableWidget(new DepressibleButton(this.leftPos + (this.guiWidth - bw) / 2, this.topPos + this.guiHeight - 50, bw, bh, Component.literal("Confirm"), b -> onConfirm()));
-
-        // Categoria e botões de cor/configuração
-        // Top label area is rendered between existing arrows; add color buttons below
-        int cx = this.leftPos + 20;
-        int cy = this.topPos + 30;
-        // skin color button
-        this.addRenderableWidget(new DepressibleButton(cx, cy, 20, 20, Component.literal(""), b -> openColorPicker("skin")));
-        // hair selection + hair color
-        this.addRenderableWidget(new DepressibleButton(cx + 25, cy, 80, 20, Component.literal("Hair"), b -> onButtonPressed("hair")));
-        this.addRenderableWidget(new DepressibleButton(cx + 25 + 85, cy, 20, 20, Component.literal(""), b -> openColorPicker("hair")));
-
-        // two empty placeholders below
-        int cy2 = cy + 25;
-        this.addRenderableWidget(new DepressibleButton(cx, cy2, 80, 20, Component.literal(""), b -> {}));
-        this.addRenderableWidget(new DepressibleButton(cx + 85, cy2, 80, 20, Component.literal(""), b -> {}));
-        // two color buttons without functionality
-        this.addRenderableWidget(new DepressibleButton(cx, cy2 + 25, 20, 20, Component.literal(""), b -> {}));
-        this.addRenderableWidget(new DepressibleButton(cx + 25, cy2 + 25, 20, 20, Component.literal(""), b -> {}));
-    }
-
-    private void onButtonPressed(String id) {
-        // Hook: selecionar raça / alterar pré-visualização
-        // Implementação real deve atualizar PlayerRaceCap e a pré-visualização
-        System.out.println("Button pressed: " + id);
-        // tenta encontrar texturas em ordem de prioridade:
-        // 1) assets/dbi/textures/entity/race/customizacao/<id>.png
-        // 2) assets/dbi/textures/entity/race/<id>.png
-        // 3) assets/dbi/textures/player/<id>.png
-        ResourceLocation[] candidates = new ResourceLocation[] {
-                new ResourceLocation(Dbi.MOD_ID, "textures/entity/race/customizacao/" + id + ".png"),
-                new ResourceLocation(Dbi.MOD_ID, "textures/entity/race/" + id + ".png"),
-                new ResourceLocation(Dbi.MOD_ID, "textures/player/" + id + ".png")
-        };
-        for (ResourceLocation r : candidates) {
-            try {
-                // tentar obter o recurso — getResource lança IOException se não existir
-                this.minecraft.getResourceManager().getResource(r);
-                this.selectedTexture = r;
-                System.out.println("Selected texture: " + r);
-                return;
-            } catch (Exception ignored) {
-            }
+        // Cabelo
+        if (cabelo) {
+            arrow(opX,        cy, aw, ah, "<<", "hair_p"); arrow(opX+opW-aw, cy, aw, ah, ">>", "hair_n"); cy += gap;
+            swatch(opX+(opW-100)/2, cy, 100, 18, hairColor, "hair"); cy += gap;
         }
-        // se não achou, mantém null
+
+        // Adulto/Criança
+        arrow(opX,        cy, aw, ah, "<<", "age_p"); arrow(opX+opW-aw, cy, aw, ah, ">>", "age_n"); cy += gap;
+
+        // Tipo de Corpo
+        arrow(opX,        cy, aw, ah, "<<", "body_p"); arrow(opX+opW-aw, cy, aw, ah, ">>", "body_n"); cy += gap;
+
+        // Swatches corpo
+        int sw=32,sh=22,stot=sw*3+8,ssx=opX+(opW-stot)/2;
+        swatch(ssx,       cy, sw, sh, bodyColor,           "body");
+        swatch(ssx+sw+4,  cy, sw, sh, lighter(bodyColor,.15f), "body_l");
+        swatch(ssx+sw*2+8,cy, sw, sh, darker (bodyColor,.20f), "body_d");
+        cy += sh+6;
+
+        // Nariz
+        arrow(opX,        cy, aw, ah, "<<", "nose_p"); arrow(opX+opW-aw, cy, aw, ah, ">>", "nose_n"); cy += gap;
+        // Boca
+        arrow(opX,        cy, aw, ah, "<<", "mouth_p"); arrow(opX+opW-aw, cy, aw, ah, ">>", "mouth_n"); cy += gap;
+        // Olhos
+        arrow(opX,        cy, aw, ah, "<<", "eye_p");  arrow(opX+opW-aw, cy, aw, ah, ">>", "eye_n");  cy += gap;
+
+        // Swatches olhos
+        int ew=48,etot=ew*2+6,esx=opX+(opW-etot)/2;
+        swatch(esx,     cy, ew, sh, eyeColor,              "eyes");
+        swatch(esx+ew+6,cy, ew, sh, darker(eyeColor,.30f), "eyes_d");
+        cy += sh+8;
+
+        // Igualar
+        btn(opX+(opW-110)/2, cy, 110, 24, "Igualar", "equal");
+
+        // X / Próx
+        btn(panX+8,           panY+panH-34, 32, 26, "X",    "close");
+        btn(panX+panW-76,     panY+panH-34, 68, 26, "Próx", "prox");
     }
 
-    // botão que afunda ao ser pressionado/hover
-    private static class DepressibleButton extends Button {
-        public DepressibleButton(int x, int y, int w, int h, Component msg, Button.OnPress onPress) {
-            super(x, y, w, h, msg, onPress, (component) -> Component.empty());
+    // ── helpers ──────────────────────────────────────────────
+
+    private void arrow(int x,int y,int w,int h,String lbl,String id) {
+        addRenderableWidget(Button.builder(Component.literal(lbl), b->act(id)).pos(x,y).size(w,h).build());
+    }
+    private void btn(int x,int y,int w,int h,String lbl,String id) {
+        addRenderableWidget(Button.builder(Component.literal(lbl), b->act(id)).pos(x,y).size(w,h).build());
+    }
+    private void swatch(int x,int y,int w,int h,int col,String tgt) {
+        addRenderableWidget(new SwatchBtn(x,y,w,h,col,tgt, b->openPicker(((SwatchBtn)b).tgt)));
+    }
+
+    // =========================================================
+    //  AÇÕES
+    // =========================================================
+
+    private void act(String id) {
+        String[] r = RACE_DEFS[raceIdx];
+        int maxBody = Integer.parseInt(r[4]);
+        int maxNose = Integer.parseInt(r[5]);
+        int maxMouth= Integer.parseInt(r[6]);
+        int maxEye  = Integer.parseInt(r[7]);
+        switch (id) {
+            case "race_p"  -> { raceIdx=(raceIdx-1+RACE_DEFS.length)%RACE_DEFS.length; resetRace(); return; }
+            case "race_n"  -> { raceIdx=(raceIdx+1)%RACE_DEFS.length;                  resetRace(); return; }
+            case "form_p"  -> { if (RACE_FORMS[raceIdx].length>0) formIdx=Math.max(0,formIdx-1); }
+            case "form_n"  -> { if (RACE_FORMS[raceIdx].length>0) formIdx=Math.min(RACE_FORMS[raceIdx].length-1,formIdx+1); }
+            case "hair_p"  -> { hairStyle=Math.max(0,hairStyle-1); }
+            case "hair_n"  -> { hairStyle=Math.min(HAIR_STYLES-1,hairStyle+1); }
+            case "age_p"   -> { ageIdx=Math.max(0,ageIdx-1); }
+            case "age_n"   -> { ageIdx=Math.min(1,ageIdx+1); }
+            case "body_p"  -> { bodyTypeIdx=Math.max(0,bodyTypeIdx-1); build(); return; }
+            case "body_n"  -> { bodyTypeIdx=Math.min(maxBody-1,bodyTypeIdx+1); build(); return; }
+            case "nose_p"  -> { noseIdx=Math.max(0,noseIdx-1); }
+            case "nose_n"  -> { noseIdx=Math.min(maxNose-1,noseIdx+1); }
+            case "mouth_p" -> { mouthIdx=Math.max(0,mouthIdx-1); }
+            case "mouth_n" -> { mouthIdx=Math.min(maxMouth-1,mouthIdx+1); }
+            case "eye_p"   -> { eyeIdx=Math.max(0,eyeIdx-1); }
+            case "eye_n"   -> { eyeIdx=Math.min(maxEye-1,eyeIdx+1); }
+            case "equal"   -> { eyeColor=bodyColor; hairColor=bodyColor; build(); return; }
+            case "close"   -> { onClose(); return; }
+            case "prox"    -> { save(); return; }
         }
     }
 
-    private void onConfirm() {
-        // Persistir seleção no NBT do jogador (cliente) como marcador temporário — integração servidor necessária
-        if (this.selectedTexture != null && this.minecraft != null && this.minecraft.player != null) {
-            try {
-                this.minecraft.player.getPersistentData().putString("dbi:race_texture", this.selectedTexture.toString());
-            } catch (Exception ignored) {
-            }
-        }
+    private void resetRace() { formIdx=hairStyle=ageIdx=bodyTypeIdx=noseIdx=mouthIdx=eyeIdx=0; initColors(); build(); }
+
+    private void initColors() {
+        String[] r = RACE_DEFS[raceIdx];
+        bodyColor = (int)Long.parseLong(r[8].replace("0x",""),16);
+        hairColor = (int)Long.parseLong(r[9].replace("0x",""),16);
+        eyeColor  = (int)Long.parseLong(r[10].replace("0x",""),16);
     }
 
-    private void openColorPicker(String target) {
-        this.colorTarget = target;
-        this.showColorPicker = true;
-        // position picker centered inside GUI
-        this.pickerW = 180;
-        this.pickerH = 120;
-        this.pickerX = this.leftPos + (this.guiWidth - pickerW) / 2;
-        this.pickerY = this.topPos + (this.guiHeight - pickerH) / 2;
-        this.sliderW = 12;
-        this.sliderH = pickerH;
-        this.sliderX = this.pickerX + this.pickerW + 6;
-        this.sliderY = this.pickerY;
-        // initialize picker HSV from current color
-        int cur = "skin".equals(target) ? this.skinColor : this.hairColor;
-        float[] hsv = rgbToHsv(cur);
-        this.pickerHue = hsv[0];
-        this.pickerSat = hsv[1];
-        this.pickerVal = hsv[2];
+    private void save() {
+        if (minecraft==null||minecraft.player==null) { onClose(); return; }
+        var nbt = minecraft.player.getPersistentData();
+        String[] r = RACE_DEFS[raceIdx];
+        nbt.putString("dbi:race",         r[0]);
+        nbt.putString("dbi:raceDisplay",  r[1]);
+        nbt.putInt   ("dbi:formIdx",       formIdx);
+        nbt.putInt   ("dbi:hairStyle",     hairStyle);
+        nbt.putInt   ("dbi:ageIdx",        ageIdx);
+        nbt.putInt   ("dbi:bodyTypeIdx",   bodyTypeIdx);
+        nbt.putInt   ("dbi:noseIdx",       noseIdx);
+        nbt.putInt   ("dbi:mouthIdx",      mouthIdx);
+        nbt.putInt   ("dbi:eyeIdx",        eyeIdx);
+        nbt.putInt   ("dbi:bodyColor",     bodyColor);
+        nbt.putInt   ("dbi:hairColor",     hairColor);
+        nbt.putInt   ("dbi:eyeColor",      eyeColor);
+        // Envia ao servidor
+        ModNetwork.sendToServer(new RaceSelectionPacket(
+            r[0], formIdx, hairStyle, ageIdx, bodyTypeIdx,
+            noseIdx, mouthIdx, eyeIdx, bodyColor, hairColor, eyeColor
+        ));
+        onClose();
     }
 
-    // RGB (0xRRGGBB or 0xAARRGGBB) to HSV {h,s,v}
-    private float[] rgbToHsv(int rgb) {
-        int r = (rgb >> 16) & 0xFF;
-        int g = (rgb >> 8) & 0xFF;
-        int b = rgb & 0xFF;
-        float rf = r / 255f, gf = g / 255f, bf = b / 255f;
-        float max = Math.max(rf, Math.max(gf, bf));
-        float min = Math.min(rf, Math.min(gf, bf));
-        float d = max - min;
-        float h = 0f;
-        if (d == 0) h = 0f;
-        else if (max == rf) h = 60f * (((gf - bf) / d) % 6f);
-        else if (max == gf) h = 60f * (((bf - rf) / d) + 2f);
-        else h = 60f * (((rf - gf) / d) + 4f);
-        if (h < 0) h += 360f;
-        float s = max == 0 ? 0f : d / max;
-        float v = max;
-        return new float[]{h, s, v};
+    // =========================================================
+    //  COLOR PICKER
+    // =========================================================
+
+    private void openPicker(String tgt) {
+        pickerTarget=tgt; showPicker=true;
+        px=width/2-(PW+SW+10)/2; py=height/2-PH/2;
+        sx=px+PW+6; sy=py;
+        float[] hsv=rgb2hsv(pickerCol());
+        ph=hsv[0]; ps=hsv[1]; pv=hsv[2];
+    }
+
+    private int pickerCol() {
+        if ("hair".equals(pickerTarget)) return hairColor;
+        if (pickerTarget!=null&&pickerTarget.startsWith("eye")) return eyeColor;
+        return bodyColor;
+    }
+
+    private void applyPick(int rgb) {
+        int c=(0xFF<<24)|(rgb&0xFFFFFF);
+        if ("hair".equals(pickerTarget))                         hairColor=c;
+        else if (pickerTarget!=null&&pickerTarget.startsWith("eye")) eyeColor=c;
+        else                                                     bodyColor=c;
+        build();
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.showColorPicker) {
-            int mx = (int) mouseX;
-            int my = (int) mouseY;
-            // inside hue-sat square
-            if (mx >= pickerX && mx < pickerX + pickerW && my >= pickerY && my < pickerY + pickerH) {
-                int rx = mx - pickerX;
-                int ry = my - pickerY;
-                this.pickerHue = (rx / (float)(pickerW - 1)) * 360f;
-                this.pickerSat = 1f - (ry / (float)(pickerH - 1));
-                int rgb = hsvToRgb(this.pickerHue, this.pickerSat, this.pickerVal);
-                applyPickedColor(rgb);
-                return true;
+    public boolean mouseClicked(double mx,double my,int btn) {
+        if (showPicker) {
+            int x=(int)mx,y=(int)my;
+            if (x>=px&&x<px+PW&&y>=py&&y<py+PH) {
+                ph=(x-px)/(float)(PW-1)*360f; ps=1f-(y-py)/(float)(PH-1);
+                applyPick(hsv2rgb(ph,ps,pv)); return true;
             }
-            // slider
-            if (mx >= sliderX && mx < sliderX + sliderW && my >= sliderY && my < sliderY + sliderH) {
-                int ry = my - sliderY;
-                this.pickerVal = 1f - (ry / (float)(sliderH - 1));
-                int rgb = hsvToRgb(this.pickerHue, this.pickerSat, this.pickerVal);
-                applyPickedColor(rgb);
-                return true;
+            if (x>=sx&&x<sx+SW&&y>=sy&&y<sy+PH) {
+                pv=1f-(y-sy)/(float)(PH-1); applyPick(hsv2rgb(ph,ps,pv)); return true;
             }
-            // click outside picker closes it
-            this.showColorPicker = false;
-            this.colorTarget = null;
-            return true;
+            showPicker=false; pickerTarget=null; return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(mx,my,btn);
     }
 
-    private void applyPickedColor(int rgb) {
-        int color = (0xFF << 24) | (rgb & 0xFFFFFF);
-        if ("skin".equals(this.colorTarget)) this.skinColor = color;
-        else if ("hair".equals(this.colorTarget)) this.hairColor = color;
+    // =========================================================
+    //  RENDER
+    // =========================================================
+
+    @Override
+    public void render(GuiGraphics g, int mx, int my, float pt) {
+        renderBackground(g);
+
+        // Painel
+        g.fill(panX,panY,panX+panW,panY+panH,0xEE111111);
+        border(g,panX,panY,panW,panH,0xFF444444);
+
+        // Títulos
+        String[] r=RACE_DEFS[raceIdx];
+        g.drawString(font,"Aparência",panX+12,panY+14,0xFFFFFFFF,false);
+        int midX=opX+opW/2;
+        g.drawCenteredString(font,r[1],midX,panY+14,0xFFFFFFFF);
+
+        // Preview
+        g.fill(prX,prY,prX+prW,prY+prH,0xFF1A1A1A);
+        border(g,prX,prY,prW,prH,0xFF555555);
+        drawPreview(g);
+
+        // Separador
+        g.fill(opX-8,panY+46,opX-7,panY+panH-38,0xFF444444);
+
+        // Labels das opções
+        drawLabels(g,r,midX);
+
+        // Widgets
+        super.render(g,mx,my,pt);
+
+        // Picker
+        if (showPicker) drawPicker(g);
     }
 
-    // Simple HSV -> RGB (returns 0xRRGGBB)
-    private int hsvToRgb(float h, float s, float v) {
-        int hi = (int)(h / 60f) % 6;
-        float f = (h / 60f) - (int)(h / 60f);
-        float p = v * (1 - s);
-        float q = v * (1 - f * s);
-        float t = v * (1 - (1 - f) * s);
-        float r=0,g=0,b=0;
-        switch (hi) {
-            case 0: r=v; g=t; b=p; break;
-            case 1: r=q; g=v; b=p; break;
-            case 2: r=p; g=v; b=t; break;
-            case 3: r=p; g=q; b=v; break;
-            case 4: r=t; g=p; b=v; break;
-            case 5: r=v; g=p; b=q; break;
+    private void drawLabels(GuiGraphics g, String[] r, int midX) {
+        boolean forma  ="true".equals(r[2]);
+        boolean cabelo ="true".equals(r[3]);
+        int cy=panY+52, gap=26;
+
+        if (forma&&RACE_FORMS[raceIdx].length>0) {
+            int fi=Math.min(formIdx,RACE_FORMS[raceIdx].length-1);
+            g.drawCenteredString(font,"Forma: "+RACE_FORMS[raceIdx][fi],midX,cy+4,0xFFFFFFFF); cy+=gap;
         }
-        int ri = Math.round(r * 255);
-        int gi = Math.round(g * 255);
-        int bi = Math.round(b * 255);
-        return (ri << 16) | (gi << 8) | bi;
+        if (cabelo) {
+            g.drawCenteredString(font,"Cabelo Custom "+(hairStyle+1),midX,cy+4,0xFFFFFFFF); cy+=gap;
+            cy+=gap; // linha swatch
+        }
+        g.drawCenteredString(font,ageIdx==0?"Adulto":"Criança",midX,cy+4,0xFFFFFFFF); cy+=gap;
+        g.drawCenteredString(font,"Skin Custom",midX,cy-2,0xFFFFFFFF);
+        g.drawCenteredString(font,"Tipo de Corpo "+(bodyTypeIdx+1),midX,cy+8,0xFFFFFFFF); cy+=gap;
+        cy+=28; // swatches corpo
+        g.drawCenteredString(font,"Nariz  "+(noseIdx+1),midX,cy+4,0xFFFFFFFF); cy+=gap;
+        g.drawCenteredString(font,"Boca   "+(mouthIdx+1),midX,cy+4,0xFFFFFFFF); cy+=gap;
+        g.drawCenteredString(font,"Olhos  "+(eyeIdx+1),midX,cy+4,0xFFFFFFFF);
     }
 
-    private void loadButtonCoords() {
-        // Reativar leitura de assets/icons.btn usando API Forge 1.20.1
-        ResourceLocation coordsRes = new ResourceLocation(Dbi.MOD_ID, "textures/gui/icons.btn");
-        // Primeiro tenta ler do classpath (útil durante desenvolvimento)
-        InputStream cis = getClass().getResourceAsStream("/assets/dbi/textures/gui/icons.btn");
-        if (cis != null) {
-            try (InputStream is = cis; BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    line = line.trim();
-                    if (line.isEmpty() || line.startsWith("#")) continue;
-                    String[] parts = line.split("\\s+");
-                    if (parts.length >= 5) {
-                        String id = parts[0];
-                        int x = Integer.parseInt(parts[1]);
-                        int y = Integer.parseInt(parts[2]);
-                        int w = Integer.parseInt(parts[3]);
-                        int h = Integer.parseInt(parts[4]);
-                        buttonCoords.put(id, new int[]{x, y, w, h});
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-            return;
-        }
-        // Fallback: tentar pelo ResourceManager (se disponível na versão/mappings)
+    /** Preview 2D com silhueta colorida + textura da raça se disponível */
+    private void drawPreview(GuiGraphics g) {
+        // Tenta carregar textura da raça
+        String raceId = RACE_DEFS[raceIdx][0];
+        ResourceLocation raceTex = new ResourceLocation(Dbi.MOD_ID,
+            "textures/entity/race/"+raceId+".png");
+        boolean hasRaceTex = false;
         try {
-            Optional<Resource> opt = this.minecraft.getResourceManager().getResource(coordsRes);
-            if (!opt.isPresent()) return;
-            // Usar método genérico para obter InputStream via reflection se necessário
-            try {
-                java.lang.reflect.Method m = opt.get().getClass().getMethod("open");
-                try (InputStream is = (InputStream) m.invoke(opt.get()); BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
-                    String line;
-                    while ((line = r.readLine()) != null) {
-                        line = line.trim();
-                        if (line.isEmpty() || line.startsWith("#")) continue;
-                        String[] parts = line.split("\\s+");
-                        if (parts.length >= 5) {
-                            String id = parts[0];
-                            int x = Integer.parseInt(parts[1]);
-                            int y = Integer.parseInt(parts[2]);
-                            int w = Integer.parseInt(parts[3]);
-                            int h = Integer.parseInt(parts[4]);
-                            buttonCoords.put(id, new int[]{x, y, w, h});
-                        }
-                    }
-                }
-            } catch (NoSuchMethodException nsme) {
-                // método não encontrado; ignorar fallback
-            }
-        } catch (Exception e) {
-            // falha ao ler, manter sem botões dinâmicos
-        }
-    }
+            minecraft.getResourceManager().getResource(raceTex);
+            hasRaceTex = true;
+        } catch (Exception ignored) {}
 
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        this.renderBackground(guiGraphics);
-        // desenhar background 512x512 (PNG é 1024x1024, escala 0.5)
-        RenderSystem.setShaderTexture(0, background);
-        guiGraphics.blit(background, this.leftPos, this.topPos, 0, 0, this.guiWidth, this.guiHeight, 1024, 1024);
-
-        // desenhar área de preview (2D da textura legada)
-        if (this.selectedTexture != null) {
-            RenderSystem.setShaderTexture(0, this.selectedTexture);
-            guiGraphics.blit(this.selectedTexture, this.leftPos + previewX, this.topPos + previewY, 0, 0, previewW, previewH, previewW, previewH);
+        int cx=prX+prW/2, cy=prY+prH/2;
+        if (hasRaceTex) {
+            // Desenha textura plana da raça (skin 2D)
+            g.blit(raceTex, cx-16, cy-32, 8, 8, 8, 8, 64, 64); // cabeça
+            g.blit(raceTex, cx-12, cy-24, 20, 20, 8, 12, 64, 64); // corpo
         } else {
-            guiGraphics.fill(this.leftPos + previewX, this.topPos + previewY, this.leftPos + previewX + previewW, this.topPos + previewY + previewH, 0xFF444444);
+            // Silhueta de fallback com as cores escolhidas
+            int bc=(0xFF<<24)|(bodyColor&0xFFFFFF);
+            int ec=(0xFF<<24)|(eyeColor &0xFFFFFF);
+            int hc=(0xFF<<24)|(hairColor&0xFFFFFF);
+            g.fill(cx-13,cy-55,cx+13,cy-29,bc); // cabeça
+            g.fill(cx-10,cy-29,cx+10,cy+9 ,bc); // corpo
+            g.fill(cx-10,cy+9 ,cx-2 ,cy+42,bc); // perna E
+            g.fill(cx+2 ,cy+9 ,cx+10,cy+42,bc); // perna D
+            g.fill(cx-21,cy-29,cx-10,cy+5 ,bc); // braço E
+            g.fill(cx+10,cy-29,cx+21,cy+5 ,bc); // braço D
+            g.fill(cx-9 ,cy-48,cx-4 ,cy-43,ec); // olho E
+            g.fill(cx+4 ,cy-48,cx+9 ,cy-43,ec); // olho D
+            if ("true".equals(RACE_DEFS[raceIdx][3]))
+                g.fill(cx-14,cy-63,cx+14,cy-54,hc); // cabelo
         }
-        // desenhar top label entre setas
-        int labelX = this.leftPos + 50;
-        int labelY = this.topPos + 12;
-        guiGraphics.drawString(this.font, Component.literal(this.topLabel), labelX, labelY, 0xFFFFFF);
 
-        // desenhar botões de cor (pequenos retângulos) indicando cor atual
-        int scx = this.leftPos + 10;
-        int scy = this.topPos + 24;
-        guiGraphics.fill(scx, scy, scx + 18, scy + 18, (0xFF << 24) | (this.skinColor & 0xFFFFFF));
-        int hcx = this.leftPos + 24 + 64;
-        int hcy = scy;
-        guiGraphics.fill(hcx, hcy, hcx + 18, hcy + 18, (0xFF << 24) | (this.hairColor & 0xFFFFFF));
-
-        super.render(guiGraphics, mouseX, mouseY, partialTicks);
-
-        // Render color picker overlay if active
-        if (this.showColorPicker) {
-            guiGraphics.fill(this.pickerX - 2, this.pickerY - 2, this.pickerX + this.pickerW + this.sliderW + 10, this.pickerY + this.pickerH + 2, 0xFF222222);
-            for (int xx = 0; xx < pickerW; xx++) {
-                for (int yy = 0; yy < pickerH; yy++) {
-                    float h = (xx / (float)(pickerW - 1)) * 360f;
-                    float s = 1f - (yy / (float)(pickerH - 1));
-                    float v = 1f;
-                    int rgb = hsvToRgb(h, s, v);
-                    guiGraphics.fill(pickerX + xx, pickerY + yy, pickerX + xx + 1, pickerY + yy + 1, (0xFF << 24) | rgb);
-                }
-            }
-            for (int yy = 0; yy < sliderH; yy++) {
-                float v = 1f - (yy / (float)(sliderH - 1));
-                int rgb = hsvToRgb(0f, 0f, v);
-                guiGraphics.fill(sliderX, sliderY + yy, sliderX + sliderW, sliderY + yy + 1, (0xFF << 24) | rgb);
-            }
-            int infoX = sliderX + sliderW + 6;
-            int infoY = pickerY;
-            int cur = "skin".equals(this.colorTarget) ? this.skinColor : this.hairColor;
-            int r = (cur >> 16) & 0xFF;
-            int g = (cur >> 8) & 0xFF;
-            int b = cur & 0xFF;
-            guiGraphics.drawString(this.font, Component.literal("Target: " + this.colorTarget), infoX, infoY, 0xFFFFFF);
-            guiGraphics.drawString(this.font, Component.literal(String.format("RGB: %d %d %d", r, g, b)), infoX, infoY + 10, 0xFFFFFF);
+        // Overlay do cabelo custom (se raça tiver cabelo)
+        if ("true".equals(RACE_DEFS[raceIdx][3]) && hairStyle>=0) {
+            ResourceLocation hairTex = new ResourceLocation(Dbi.MOD_ID,
+                "textures/entity/customizacao/hair/hair_base"+(hairStyle+1)+".png");
+            try {
+                minecraft.getResourceManager().getResource(hairTex);
+                g.blit(hairTex, cx-16, prY+prH/2-63, 0, 0, 32, 32, 32, 32);
+            } catch (Exception ignored) {}
         }
     }
 
-    // Placeholder para aplicar uma textura legada ao player model — delegar para utilitário
-    private void applyLegacyTextureToPlayer(ResourceLocation legacyTexture) {
-        // Placeholder: integração com renderer/capability necessária.
-        // A ideia: mapear a textura legada (1.7.10) para as UVs do `PlayerModel` e atualizar o `PlayerRaceCap`
-        this.selectedTexture = legacyTexture;
+    private void drawPicker(GuiGraphics g) {
+        g.fill(px-4,py-4,px+PW+SW+28,py+PH+4,0xFF222222);
+        border(g,px-4,py-4,PW+SW+32,PH+8,0xFF777777);
+        for (int i=0;i<PW;i++) for (int j=0;j<PH;j++)
+            g.fill(px+i,py+j,px+i+1,py+j+1,(0xFF<<24)|hsv2rgb(i/(float)(PW-1)*360f,1f-(j/(float)(PH-1)),1f));
+        for (int j=0;j<PH;j++)
+            g.fill(sx,sy+j,sx+SW,sy+j+1,(0xFF<<24)|hsv2rgb(ph,1f,1f-(j/(float)(PH-1))));
+        int curX=px+(int)(ph/360f*(PW-1)), curY=py+(int)((1f-ps)*(PH-1));
+        g.fill(curX-3,curY-1,curX+3,curY+1,0xFFFFFFFF);
+        g.fill(curX-1,curY-3,curX+1,curY+3,0xFFFFFFFF);
+        int cur=pickerCol();
+        g.fill(sx+SW+6,py,sx+SW+28,py+22,(0xFF<<24)|(cur&0xFFFFFF));
+        g.drawString(font,String.format("#%06X",cur&0xFFFFFF),sx+SW+6,py+26,0xFFAAAAAA,false);
     }
 
-    private void determineGuiSize() {
-        // GUI size is fixed at 512x512 (half of background PNG 1024x1024)
-        // Just center it on screen
-        this.leftPos = (this.width - this.guiWidth) / 2;
-        this.topPos = (this.height - this.guiHeight) / 2;
+    // =========================================================
+    //  UTILS
+    // =========================================================
+
+    private void border(GuiGraphics g,int x,int y,int w,int h,int c) {
+        g.fill(x,y,x+w,y+1,c); g.fill(x,y+h-1,x+w,y+h,c);
+        g.fill(x,y,x+1,y+h,c); g.fill(x+w-1,y,x+w,y+h,c);
     }
 
+    private int lighter(int color,float a) {
+        int r=Math.min(255,(int)(((color>>16)&0xFF)+255*a));
+        int g=Math.min(255,(int)(((color>>8 )&0xFF)+255*a));
+        int b=Math.min(255,(int)(( color     &0xFF)+255*a));
+        return (0xFF<<24)|(r<<16)|(g<<8)|b;
+    }
+    private int darker(int color,float a) {
+        int r=Math.max(0,(int)(((color>>16)&0xFF)-255*a));
+        int g=Math.max(0,(int)(((color>>8 )&0xFF)-255*a));
+        int b=Math.max(0,(int)(( color     &0xFF)-255*a));
+        return (0xFF<<24)|(r<<16)|(g<<8)|b;
+    }
+
+    private int hsv2rgb(float h,float s,float v){
+        int hi=(int)(h/60f)%6; float f=h/60f-(int)(h/60f),p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);
+        float r=0,g=0,b=0;
+        switch(hi){case 0->{r=v;g=t;b=p;}case 1->{r=q;g=v;b=p;}case 2->{r=p;g=v;b=t;}
+                   case 3->{r=p;g=q;b=v;}case 4->{r=t;g=p;b=v;}case 5->{r=v;g=p;b=q;}}
+        return (Math.round(r*255)<<16)|(Math.round(g*255)<<8)|Math.round(b*255);
+    }
+    private float[] rgb2hsv(int rgb){
+        float r=((rgb>>16)&0xFF)/255f,g=((rgb>>8)&0xFF)/255f,b=(rgb&0xFF)/255f;
+        float mx=Math.max(r,Math.max(g,b)),mn=Math.min(r,Math.min(g,b)),d=mx-mn,h=0;
+        if(d!=0){if(mx==r)h=60f*((g-b)/d%6f);else if(mx==g)h=60f*((b-r)/d+2f);else h=60f*((r-g)/d+4f);}
+        if(h<0)h+=360f;
+        return new float[]{h,mx==0?0:d/mx,mx};
+    }
+
+    // =========================================================
+    //  INNER CLASS — SwatchBtn
+    // =========================================================
+
+    private static class SwatchBtn extends Button {
+        final String tgt;
+        int color;
+        SwatchBtn(int x,int y,int w,int h,int color,String tgt,OnPress p){
+            super(x,y,w,h,Component.empty(),p,DEFAULT_NARRATION);
+            this.color=color; this.tgt=tgt;
+        }
+        @Override public void renderWidget(GuiGraphics g,int mx,int my,float pt){
+            g.fill(getX()-1,getY()-1,getX()+width+1,getY()+height+1,isHovered()?0xFFFFFFFF:0xFF888888);
+            g.fill(getX(),getY(),getX()+width,getY()+height,(0xFF<<24)|(color&0xFFFFFF));
+        }
+    }
 }
