@@ -3,24 +3,23 @@ loaderVersion="[47,)"
 license="All Rights Reserved"
 
 [[mods]]
-modId="dbi"
+modId="dragonblockinfinity"
 version="1.0.0"
 displayName="Dragon Block Infinity"
-authors="Bernardo"
 description='''
-Mod de raças e sistema inspirado em Dragon Ball.
+Dragon Block mod inspirado em Dragon Ball Z
 '''
 
 [[dependencies.dbi]]
-modId="forge"
-mandatory=true
-versionRange="[47,)"
-ordering="NONE"
-side="BOTH"
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
 
 [[dependencies.dbi]]
-modId="minecraft"
-mandatory=true
-versionRange="[1.20.1]"
-ordering="NONE"
-side="BOTH"]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1]"
+    ordering="NONE"
+    side="BOTH"
