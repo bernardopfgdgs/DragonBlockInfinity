@@ -1,5 +1,7 @@
 package com.bernardo.dbi;
 
+import com.bernardo.dbi.block.BlockRegistry;
+import com.bernardo.dbi.block.entity.ModBlockEntities;
 import com.bernardo.dbi.race.RaceRegistry;
 import com.bernardo.dbi.network.ModNetwork;
 import com.bernardo.dbi.capability.PlayerRaceCap;
@@ -13,19 +15,18 @@ public class ModRegister {
     public static void registerAll() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // Registrar raças
-        RaceRegistry.registerAll();
+        // Registrar blocos
+        BlockRegistry.BLOCKS.register(modEventBus);
+        
+        // Registrar entidades de bloco
+        ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
 
-        // Registrar estilos de luta
+        // Registrar sistemas existentes
+        RaceRegistry.registerAll();
         StyleRegistry.registerAll();
 
-        // Registrar rede
         ModNetwork.register(modEventBus);
-
-        // Registrar capabilities
         PlayerRaceCap.register(modEventBus);
         PlayerStatusCap.register(modEventBus);
-
-        // Adicionar outros registros aqui conforme necessário
     }
 }
