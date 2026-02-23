@@ -18,10 +18,10 @@ public class MenuButton extends Button {
 
     @Override
     public void renderWidget(GuiGraphics g, int mx, int my, float pt) {
-        // SEM FUNDO — só o sprite
-        g.blit(id.texture, getX(), getY(), id.u, id.v, width, height, id.texW, id.texH);
-        // Hover effect sutil
-        if (isHovered()) g.fill(getX(), getY(), getX()+width, getY()+height, 0x33FFFFFF);
+        int x = getX(), y = getY();
+        g.fill(x-1, y-1, x+width+1, y+height+1, isHovered() ? 0xFFFFFFFF : 0xFF666666);
+        g.blit(id.texture, x, y, id.u, id.v, width, height, id.texW, id.texH);
+        if (isHovered()) g.fill(x, y, x+width, y+height, 0x33FFFFFF);
     }
 
     public ButtonId getButtonId() { return id; }
