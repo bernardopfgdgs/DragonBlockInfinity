@@ -164,58 +164,98 @@ public class CharacterScreen extends Screen {
         addRenderableWidget(new SwatchBtn(x, y, w, h, color, key, b -> openPicker(key)));
     }
 
+    // action constants for readability
+    private static final String ACT_RACE_PREV = "race_p";
+    private static final String ACT_RACE_NEXT = "race_n";
+    private static final String ACT_FORM_PREV = "form_p";
+    private static final String ACT_FORM_NEXT = "form_n";
+    private static final String ACT_HAIR_PREV = "hair_p";
+    private static final String ACT_HAIR_NEXT = "hair_n";
+    private static final String ACT_AGE_PREV  = "age_p";
+    private static final String ACT_AGE_NEXT  = "age_n";
+    private static final String ACT_BODY_PREV = "body_p";
+    private static final String ACT_BODY_NEXT = "body_n";
+    private static final String ACT_NOSE_PREV = "nose_p";
+    private static final String ACT_NOSE_NEXT = "nose_n";
+    private static final String ACT_MOUTH_PREV= "mouth_p";
+    private static final String ACT_MOUTH_NEXT= "mouth_n";
+    private static final String ACT_EYE_PREV  = "eye_p";
+    private static final String ACT_EYE_NEXT  = "eye_n";
+    private static final String ACT_EQUAL     = "equal";
+    private static final String ACT_CLOSE     = "close";
+    private static final String ACT_PROX      = "prox";
+
     private void act(String key) {
         String[] r = RACE_DEFS[raceIdx];
         int maxBody  = Integer.parseInt(r[4]);
         int maxNose  = Integer.parseInt(r[5]);
         int maxMouth = Integer.parseInt(r[6]);
         int maxEye   = Integer.parseInt(r[7]);
-        
-        if (key.equals("race_p")) {
-            raceIdx = (raceIdx - 1 + RACE_DEFS.length) % RACE_DEFS.length;
-            resetRace();
-            return;
-        } else if (key.equals("race_n")) {
-            raceIdx = (raceIdx + 1) % RACE_DEFS.length;
-            resetRace();
-            return;
-        } else if (key.equals("form_p")) {
-            if (RACE_FORMS[raceIdx].length > 0) formIdx = Math.max(0, formIdx - 1);
-        } else if (key.equals("form_n")) {
-            if (RACE_FORMS[raceIdx].length > 0) formIdx = Math.min(RACE_FORMS[raceIdx].length - 1, formIdx + 1);
-        } else if (key.equals("hair_p")) {
-            hairNum = Math.max(1, hairNum - 1);
-        } else if (key.equals("hair_n")) {
-            hairNum = Math.min(HAIR_STYLES, hairNum + 1);
-        } else if (key.equals("age_p")) {
-            ageIdx = Math.max(0, ageIdx - 1);
-        } else if (key.equals("age_n")) {
-            ageIdx = Math.min(AGE_LABELS.length - 1, ageIdx + 1);
-        } else if (key.equals("body_p")) {
-            bodyTypeIdx = Math.max(0, bodyTypeIdx - 1);
-        } else if (key.equals("body_n")) {
-            bodyTypeIdx = Math.min(maxBody - 1, bodyTypeIdx + 1);
-        } else if (key.equals("nose_p")) {
-            noseIdx = Math.max(0, noseIdx - 1);
-        } else if (key.equals("nose_n")) {
-            noseIdx = Math.min(maxNose - 1, noseIdx + 1);
-        } else if (key.equals("mouth_p")) {
-            mouthIdx = Math.max(0, mouthIdx - 1);
-        } else if (key.equals("mouth_n")) {
-            mouthIdx = Math.min(maxMouth - 1, mouthIdx + 1);
-        } else if (key.equals("eye_p")) {
-            eyeIdx = Math.max(0, eyeIdx - 1);
-        } else if (key.equals("eye_n")) {
-            eyeIdx = Math.min(maxEye - 1, eyeIdx + 1);
-        } else if (key.equals("equal")) {
-            eyeColor = bodyColor;
-            hairColor = bodyColor;
-        } else if (key.equals("close")) {
-            onClose();
-            return;
-        } else if (key.equals("prox")) {
-            save();
-            return;
+
+        switch (key) {
+            case ACT_RACE_PREV:
+                raceIdx = (raceIdx - 1 + RACE_DEFS.length) % RACE_DEFS.length;
+                resetRace();
+                return;
+            case ACT_RACE_NEXT:
+                raceIdx = (raceIdx + 1) % RACE_DEFS.length;
+                resetRace();
+                return;
+            case ACT_FORM_PREV:
+                if (RACE_FORMS[raceIdx].length > 0) formIdx = Math.max(0, formIdx - 1);
+                break;
+            case ACT_FORM_NEXT:
+                if (RACE_FORMS[raceIdx].length > 0) formIdx = Math.min(RACE_FORMS[raceIdx].length - 1, formIdx + 1);
+                break;
+            case ACT_HAIR_PREV:
+                hairNum = Math.max(1, hairNum - 1);
+                break;
+            case ACT_HAIR_NEXT:
+                hairNum = Math.min(HAIR_STYLES, hairNum + 1);
+                break;
+            case ACT_AGE_PREV:
+                ageIdx = Math.max(0, ageIdx - 1);
+                break;
+            case ACT_AGE_NEXT:
+                ageIdx = Math.min(AGE_LABELS.length - 1, ageIdx + 1);
+                break;
+            case ACT_BODY_PREV:
+                bodyTypeIdx = Math.max(0, bodyTypeIdx - 1);
+                break;
+            case ACT_BODY_NEXT:
+                bodyTypeIdx = Math.min(maxBody - 1, bodyTypeIdx + 1);
+                break;
+            case ACT_NOSE_PREV:
+                noseIdx = Math.max(0, noseIdx - 1);
+                break;
+            case ACT_NOSE_NEXT:
+                noseIdx = Math.min(maxNose - 1, noseIdx + 1);
+                break;
+            case ACT_MOUTH_PREV:
+                mouthIdx = Math.max(0, mouthIdx - 1);
+                break;
+            case ACT_MOUTH_NEXT:
+                mouthIdx = Math.min(maxMouth - 1, mouthIdx + 1);
+                break;
+            case ACT_EYE_PREV:
+                eyeIdx = Math.max(0, eyeIdx - 1);
+                break;
+            case ACT_EYE_NEXT:
+                eyeIdx = Math.min(maxEye - 1, eyeIdx + 1);
+                break;
+            case ACT_EQUAL:
+                eyeColor = bodyColor;
+                hairColor = bodyColor;
+                break;
+            case ACT_CLOSE:
+                onClose();
+                return;
+            case ACT_PROX:
+                save();
+                return;
+            default:
+                // unrecognized action
+                break;
         }
         rebuild();
     }
