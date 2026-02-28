@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.style.data;
+package com.bernardo.dbi.style.data;
 
 import com.bernardo.dbi.style.IFightStyle;
 import com.bernardo.dbi.style.StyleData;

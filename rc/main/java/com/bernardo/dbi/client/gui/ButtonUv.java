@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.client.gui;
+package com.bernardo.dbi.client.gui;
 
 import net.minecraft.resources.ResourceLocation;
 

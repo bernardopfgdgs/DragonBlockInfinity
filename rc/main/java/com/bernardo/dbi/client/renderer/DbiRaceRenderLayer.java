@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.client.renderer;
+package com.bernardo.dbi.client.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.PlayerModel;

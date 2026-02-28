@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.block;
+package com.bernardo.dbi.block;
 
 import com.bernardo.dbi.Dbi;
 import net.minecraft.world.level.block.Block;

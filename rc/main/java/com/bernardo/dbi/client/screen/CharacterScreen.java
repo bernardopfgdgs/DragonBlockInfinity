@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.client.screen;
+package com.bernardo.dbi.client.screen;
 
 import com.bernardo.dbi.Dbi;
 import com.bernardo.dbi.client.gui.buttons.*;

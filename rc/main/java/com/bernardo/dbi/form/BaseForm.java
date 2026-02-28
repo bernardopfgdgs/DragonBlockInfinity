@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.form;
+package com.bernardo.dbi.form;
 
 public class BaseForm {
     // forma base (sem boost, só mastery)

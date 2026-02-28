@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.block.entity;
+package com.bernardo.dbi.block.entity;
 
 import com.bernardo.dbi.Dbi;
 import com.bernardo.dbi.block.BlockRegistry;

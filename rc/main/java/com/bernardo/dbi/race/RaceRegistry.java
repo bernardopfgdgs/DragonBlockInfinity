@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.race;
+package com.bernardo.dbi.race;
 
 import com.bernardo.dbi.status.StatusBaseMultiversal;
 import com.bernardo.dbi.util.IdentifierUtil;

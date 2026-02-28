@@ -1,3 +1,3 @@
-ackage com.bernardo.dbi.status;
+package com.bernardo.dbi.status;
 
 // Empty file, class moved to StatusBaseMultiversal.java

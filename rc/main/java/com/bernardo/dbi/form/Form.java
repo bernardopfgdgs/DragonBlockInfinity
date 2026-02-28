@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.form;
+package com.bernardo.dbi.form;
 
 public enum Form {
     Base(BaseForm.ID);

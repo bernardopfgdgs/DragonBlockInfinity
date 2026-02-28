@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.client.menu;
+package com.bernardo.dbi.client.menu;
 
 import com.bernardo.dbi.client.gui.buttons.*;
 import net.minecraft.client.gui.components.AbstractWidget;

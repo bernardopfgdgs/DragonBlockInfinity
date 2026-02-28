@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.style;
+package com.bernardo.dbi.style;
 
 import com.bernardo.dbi.style.data.MartialArts;
 import com.bernardo.dbi.style.data.Spiritualist;

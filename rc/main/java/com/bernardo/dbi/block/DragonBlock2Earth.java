@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.block;
+package com.bernardo.dbi.block;
 
 /**
  * Dragon Block 2 - Terra

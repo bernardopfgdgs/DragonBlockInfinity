@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.style;
+package com.bernardo.dbi.style;
 
 public class StyleData {
     public int str;

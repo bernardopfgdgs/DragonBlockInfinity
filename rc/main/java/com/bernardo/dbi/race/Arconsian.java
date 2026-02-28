@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.race;
+package com.bernardo.dbi.race;
 
 import com.bernardo.dbi.status.StatusMultiplier;
 

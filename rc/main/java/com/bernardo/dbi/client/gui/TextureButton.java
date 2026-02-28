@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.client.gui;
+package com.bernardo.dbi.client.gui;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

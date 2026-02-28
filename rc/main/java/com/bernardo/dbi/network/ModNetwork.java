@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.network;
+package com.bernardo.dbi.network;
 
 import com.bernardo.dbi.Dbi;
 import com.bernardo.dbi.network.packet.RaceSelectionPacket;

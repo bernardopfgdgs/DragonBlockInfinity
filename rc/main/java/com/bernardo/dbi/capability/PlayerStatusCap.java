@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.capability;
+package com.bernardo.dbi.capability;
 
 import net.minecraftforge.eventbus.api.IEventBus;
 

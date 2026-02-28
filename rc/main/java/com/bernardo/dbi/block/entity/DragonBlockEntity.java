@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.block.entity;
+package com.bernardo.dbi.block.entity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;

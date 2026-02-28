@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.network.packet;
+package com.bernardo.dbi.network.packet;
 
 import com.bernardo.dbi.capability.PlayerRaceCap;
 import net.minecraft.network.FriendlyByteBuf;

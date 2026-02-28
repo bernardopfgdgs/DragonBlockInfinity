@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.capability;
+package com.bernardo.dbi.capability;
 
 import com.bernardo.dbi.network.ModNetwork;
 import com.bernardo.dbi.network.packet.SyncRaceCapPacket;

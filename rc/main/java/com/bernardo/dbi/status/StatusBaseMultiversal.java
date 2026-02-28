@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.status;
+package com.bernardo.dbi.status;
 
 import java.util.EnumMap;
 import java.util.Map;

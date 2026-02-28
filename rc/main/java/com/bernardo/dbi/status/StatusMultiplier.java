@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.status;
+package com.bernardo.dbi.status;
 
 public class StatusMultiplier {
     public float str;

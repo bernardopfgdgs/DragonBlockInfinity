@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi;
+package com.bernardo.dbi;
 
 import com.bernardo.dbi.capability.PlayerRaceCap;
 import com.bernardo.dbi.network.ModNetwork;

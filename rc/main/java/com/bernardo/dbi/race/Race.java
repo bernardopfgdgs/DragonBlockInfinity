@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.race;
+package com.bernardo.dbi.race;
 
 public class Race {
 

@@ -1,4 +1,4 @@
-ackage com.bernardo.dbi.client;
+package com.bernardo.dbi.client;
 
 import com.bernardo.dbi.Dbi;
 import com.bernardo.dbi.client.screen.CharacterScreen;
