@@ -1,4 +1,4 @@
-  "parent": "block/block",
+{  "parent": "block/block",
   "ambientocclusion": true,
   "textures": {
     "0": "SEU_MODID:block/namek_dirty"

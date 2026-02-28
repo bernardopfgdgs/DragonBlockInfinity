@@ -1,4 +1,4 @@
-  "parent": "item/handheld",
+{  "parent": "item/handheld",
   "textures": {
     "layer0": "dragonblockinfinity:item/pesos/peso"
   },

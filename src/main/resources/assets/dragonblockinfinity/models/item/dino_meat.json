@@ -1,4 +1,4 @@
-  "parent": "item/generated",
+{  "parent": "item/generated",
   "textures": {
     "layer0": "dragonblockinfinity:item/comida/dino_meat"
   },
