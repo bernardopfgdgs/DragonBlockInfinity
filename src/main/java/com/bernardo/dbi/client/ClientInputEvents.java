@@ -6,18 +6,21 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraft.client.Minecraft;
 
-@Mod.EventBusSubscriber(modid = Dbi.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(
+    modid = Dbi.MOD_ID,
+    bus = Mod.EventBusSubscriber.Bus.FORGE,
+    value = Dist.CLIENT
+)
 public class ClientInputEvents {
 
     @SubscribeEvent
     public static void onKeyInput(InputEvent.Key event) {
-        Minecraft mc = Minecraft.getInstance();
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player == null || mc.screen != null) return;
+        
         if (ClientEvents.CHARACTER_SCREEN_KEY.consumeClick()) {
-            if (mc.screen == null) {
-                mc.setScreen(new CharacterScreen());
-            }
+            mc.setScreen(new CharacterScreen());
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.bernardo.dbi.client.screen;
 
 import com.bernardo.dbi.Dbi;
-import com.bernardo.dbi.client.menu.MenuManager;
+import com.bernardo.dbi.client.gui.buttons.*;
 import com.bernardo.dbi.network.ModNetwork;
 import com.bernardo.dbi.network.packet.RaceSelectionPacket;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,6 +14,9 @@ import net.minecraft.resources.ResourceLocation;
 public class CharacterScreen extends Screen {
 
     private static final ResourceLocation MENU_BG = new ResourceLocation(Dbi.MOD_ID, "textures/gui/menu.png");
+    private static final int MENU_UV_U = 32, MENU_UV_V = 8;
+    private static final int MENU_W = 964, MENU_H = 632;
+    private static final int TEX_SIZE = 1024;
 
     private static final String[][] RACE_DEFS = {
         { "sayajin",     "Saiyan",      "true",  "true",  "3","3","3","3","0xFFD2956E","0xFF1A1A1A","0xFF1A1A1A" },
@@ -29,19 +32,20 @@ public class CharacterScreen extends Screen {
     };
     private static final String[] AGE_LABELS = { "Adult", "Young Adult", "Child" };
     private static final int HAIR_STYLES = 12;
-    private static final int AW = 22, AH = 18, GAP = 28;
+    private static final int GAP = 22;
 
     private int raceIdx = 0, formIdx = 0, hairNum = 1, ageIdx = 0;
     private int bodyTypeIdx = 0, noseIdx = 0, mouthIdx = 0, eyeIdx = 0;
     private int bodyColor, hairColor, eyeColor;
 
     private boolean showPicker = false;
-    private String  pickerTarget;
+    private String pickerTarget;
     private static final int PW = 200, PH = 120, SW = 16;
     private int px, py, sx, sy;
     private float ph = 0, ps = 1, pv = 1;
 
-    private int panX, panY, panW, panH;
+    private int menuX, menuY, scaledMenuW, scaledMenuH;
+    private float scale;
     private int prX, prY, prW, prH;
     private int opX, opY, opW;
 
@@ -50,8 +54,6 @@ public class CharacterScreen extends Screen {
     private double lastDragX = 0, lastDragY = 0;
     private static final float MAX_YAW = 70f, MAX_PITCH = 20f;
 
-    private MenuManager menu;
-
     public CharacterScreen() {
         super(Component.literal("Appearance"));
     }
@@ -59,18 +61,26 @@ public class CharacterScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        panW = Math.min(680, width  - 40);
-        panH = Math.min(440, height - 40);
-        panX = (width  - panW) / 2;
-        panY = (height - panH) / 2;
-        prW  = panW * 34 / 100;
-        prH  = panH - 60;
-        prX  = panX + 10;
-        prY  = panY + 50;
-        opX  = prX + prW + 18;
-        opY  = panY + 52;
-        opW  = panX + panW - opX - 10;
-        menu = new MenuManager(this::addRenderableWidget, this::act);
+        
+        float scaleW = (width - 40f) / MENU_W;
+        float scaleH = (height - 40f) / MENU_H;
+        scale = Math.min(1f, Math.min(scaleW, scaleH));
+        
+        scaledMenuW = Math.round(MENU_W * scale);
+        scaledMenuH = Math.round(MENU_H * scale);
+        
+        menuX = (width - scaledMenuW) / 2;
+        menuY = (height - scaledMenuH) / 2;
+        
+        prW = (int)(scaledMenuW * 0.34f);
+        prH = scaledMenuH - (int)(60 * scale);
+        prX = menuX + (int)(10 * scale);
+        prY = menuY + (int)(50 * scale);
+        
+        opX = prX + prW + (int)(18 * scale);
+        opY = menuY + (int)(52 * scale);
+        opW = menuX + scaledMenuW - opX - (int)(10 * scale);
+        
         initColors();
         rebuild();
     }
@@ -78,51 +88,80 @@ public class CharacterScreen extends Screen {
     private void rebuild() {
         clearWidgets();
         if (showPicker) return;
-        String[] r      = RACE_DEFS[raceIdx];
+        
+        String[] r = RACE_DEFS[raceIdx];
         boolean hasForm = "true".equals(r[2]);
         boolean hasHair = "true".equals(r[3]);
+        
+        int btnSize = (int)(20 * scale);
         int cy = opY;
         int right = opX + opW;
-
-        menu.addArrows("race", opX, right, panY + 12, AW, AH);
-
+        
+        addRenderableWidget(new ArrowLeftButton(opX, menuY + (int)(12*scale), btnSize, btnSize, 
+            b -> act("race_p")));
+        addRenderableWidget(new ArrowRightButton(right - btnSize, menuY + (int)(12*scale), btnSize, btnSize, 
+            b -> act("race_n")));
+        
         if (hasForm && RACE_FORMS[raceIdx].length > 0) {
-            menu.addArrows("form", opX, right, cy, AW, AH);
-            cy += GAP;
+            addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("form_p")));
+            addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("form_n")));
+            cy += (int)(GAP * scale);
         }
+        
         if (hasHair) {
-            menu.addArrows("hair", opX, right, cy, AW, AH);
-            cy += GAP;
-            addSwatch(opX + (opW - 100) / 2, cy, 100, 18, hairColor, "hair");
-            cy += 22;
+            addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("hair_p")));
+            addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("hair_n")));
+            cy += (int)(GAP * scale);
+            addSwatch(opX + (opW - (int)(100*scale)) / 2, cy, (int)(100*scale), (int)(18*scale), hairColor, "hair");
+            cy += (int)(22 * scale);
         }
-
-        menu.addArrows("age",  opX, right, cy, AW, AH); cy += GAP;
-        menu.addArrows("body", opX, right, cy, AW, AH); cy += GAP;
-
-        int sw = 32, sh = 20, stot = sw * 3 + 8, ssx = opX + (opW - stot) / 2;
-        addSwatch(ssx,          cy, sw, sh, bodyColor,               "body");
-        addSwatch(ssx + sw + 4, cy, sw, sh, lighter(bodyColor, .15f),"body_l");
-        addSwatch(ssx+sw*2+8,   cy, sw, sh, darker(bodyColor,  .20f),"body_d");
-        cy += sh + 8;
-
-        menu.addArrows("nose",  opX, right, cy, AW, AH); cy += GAP;
-        menu.addArrows("mouth", opX, right, cy, AW, AH); cy += GAP;
-        menu.addArrows("eye",   opX, right, cy, AW, AH); cy += GAP;
-
-        int ew = 48, etot = ew * 2 + 6, esx = opX + (opW - etot) / 2;
-        addSwatch(esx,      cy, ew, sh, eyeColor,              "eyes");
-        addSwatch(esx+ew+6, cy, ew, sh, darker(eyeColor,.30f), "eyes_d");
-        cy += sh + 6;
-
-        menu.addButton("equal", opX + (opW - 80) / 2, cy, 80, 20, "Match");
-
-        menu.addButton("close", panX + 8,         panY + panH - 34, 32, 26, "Y");
-        menu.addButton("prox",  panX + panW - 78, panY + panH - 34, 70, 26, "Next");
+        
+        addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("age_p")));
+        addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("age_n")));
+        cy += (int)(GAP * scale);
+        
+        addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("body_p")));
+        addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("body_n")));
+        cy += (int)(GAP * scale);
+        
+        int sw = (int)(32*scale), sh = (int)(20*scale);
+        int stot = sw * 3 + (int)(8*scale);
+        int ssx = opX + (opW - stot) / 2;
+        addSwatch(ssx, cy, sw, sh, bodyColor, "body");
+        addSwatch(ssx + sw + (int)(4*scale), cy, sw, sh, lighter(bodyColor, .15f), "body_l");
+        addSwatch(ssx + sw*2 + (int)(8*scale), cy, sw, sh, darker(bodyColor, .20f), "body_d");
+        cy += sh + (int)(8*scale);
+        
+        addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("nose_p")));
+        addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("nose_n")));
+        cy += (int)(GAP * scale);
+        
+        addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("mouth_p")));
+        addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("mouth_n")));
+        cy += (int)(GAP * scale);
+        
+        addRenderableWidget(new ArrowLeftButton(opX, cy, btnSize, btnSize, b -> act("eye_p")));
+        addRenderableWidget(new ArrowRightButton(right - btnSize, cy, btnSize, btnSize, b -> act("eye_n")));
+        cy += (int)(GAP * scale);
+        
+        int ew = (int)(48*scale);
+        int etot = ew * 2 + (int)(6*scale);
+        int esx = opX + (opW - etot) / 2;
+        addSwatch(esx, cy, ew, sh, eyeColor, "eyes");
+        addSwatch(esx + ew + (int)(6*scale), cy, ew, sh, darker(eyeColor,.30f), "eyes_d");
+        cy += sh + (int)(6*scale);
+        
+        addRenderableWidget(new CircleButton(opX + (opW - (int)(80*scale)) / 2, cy, 
+            (int)(80*scale), (int)(20*scale), b -> act("equal")));
+        
+        addRenderableWidget(new XButton(menuX + (int)(8*scale), menuY + scaledMenuH - (int)(34*scale), 
+            (int)(32*scale), (int)(26*scale), b -> act("close")));
+        addRenderableWidget(new DiamondButton(menuX + scaledMenuW - (int)(78*scale), 
+            menuY + scaledMenuH - (int)(34*scale), (int)(70*scale), (int)(26*scale), b -> act("prox")));
     }
 
     private void addSwatch(int x, int y, int w, int h, int color, String key) {
-        addRenderableWidget(new SwatchBtn(x, y, w, h, color, key, b -> openPicker(((SwatchBtn) b).target)));
+        addRenderableWidget(new SwatchBtn(x, y, w, h, color, key, b -> openPicker(key)));
     }
 
     private void act(String key) {
@@ -210,70 +249,83 @@ public class CharacterScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
-        drawPanel(g);
+        renderMenuBackground(g);
+        renderLabels(g);
         super.render(g, mx, my, pt);
         if (showPicker) drawPicker(g);
     }
 
-    private void drawPanel(GuiGraphics g) {
-        String[] r  = RACE_DEFS[raceIdx];
-        int midX    = opX + opW / 2;
-        int cy      = opY;
+    private void renderMenuBackground(GuiGraphics g) {
+        g.blit(MENU_BG, 
+            menuX, menuY,
+            MENU_UV_U, MENU_UV_V,
+            scaledMenuW, scaledMenuH,
+            MENU_W, MENU_H,
+            TEX_SIZE, TEX_SIZE
+        );
+        
+        g.fill(prX-1, prY-1, prX + prW+1, prY + prH+1, 0xFF1A3A6E);
+        drawPreview(g);
+        
+        g.fill(opX - (int)(9*scale), menuY + (int)(46*scale), 
+               opX - (int)(8*scale), menuY + scaledMenuH - (int)(36*scale), 0xFF1A3A6E);
+    }
+
+    private void renderLabels(GuiGraphics g) {
+        String[] r = RACE_DEFS[raceIdx];
+        int midX = opX + opW / 2;
+        int cy = opY;
         boolean hasForm = "true".equals(r[2]);
         boolean hasHair = "true".equals(r[3]);
-
-        g.blit(MENU_BG, panX, panY, 0, 0, panW, panH, 1024, 1024);
-
-        g.drawString(font, "Appearance", panX + 12, panY + 14, 0xFF000000, false);
-        g.drawCenteredString(font, r[1], midX, panY + 14, 0xFF000000);
-
-        g.fill(prX-1, prY-1, prX + prW+1, prY + prH+1, 0xFF1A3A6E);
-        g.fill(prX, prY, prX + prW, prY + prH, 0x44FFFFFF);
-        drawPreview(g);
-
-        g.fill(opX - 9, panY + 46, opX - 8, panY + panH - 36, 0xFF1A3A6E);
-
+        
+        g.drawString(font, "Appearance", menuX + (int)(12*scale), menuY + (int)(14*scale), 0xFF000000, false);
+        g.drawCenteredString(font, r[1], midX, menuY + (int)(14*scale), 0xFF000000);
+        
         if (hasForm && RACE_FORMS[raceIdx].length > 0) {
             int fi = Math.min(formIdx, RACE_FORMS[raceIdx].length - 1);
-            g.drawCenteredString(font, "Form: " + RACE_FORMS[raceIdx][fi], midX, cy + 4, 0xFF000000);
-            cy += GAP;
+            g.drawCenteredString(font, "Form: " + RACE_FORMS[raceIdx][fi], midX, cy + (int)(4*scale), 0xFF000000);
+            cy += (int)(GAP * scale);
         }
         if (hasHair) {
-            g.drawCenteredString(font, "Hair " + hairNum, midX, cy + 4, 0xFF000000);
-            cy += GAP + 22;
+            g.drawCenteredString(font, "Hair " + hairNum, midX, cy + (int)(4*scale), 0xFF000000);
+            cy += (int)((GAP + 22) * scale);
         }
-        g.drawCenteredString(font, AGE_LABELS[ageIdx],           midX, cy + 4, 0xFF000000); cy += GAP;
-        g.drawCenteredString(font, "Custom Skin",                 midX, cy - 2, 0xFF000000);
-        g.drawCenteredString(font, "Body Type " + (bodyTypeIdx+1),midX, cy + 8, 0xFF000000); cy += GAP + 28;
-        g.drawCenteredString(font, "Nose "  + (noseIdx  + 1),    midX, cy + 4, 0xFF000000); cy += GAP;
-        g.drawCenteredString(font, "Mouth " + (mouthIdx + 1),    midX, cy + 4, 0xFF000000); cy += GAP;
-        g.drawCenteredString(font, "Eyes "  + (eyeIdx   + 1),    midX, cy + 4, 0xFF000000);
+        g.drawCenteredString(font, AGE_LABELS[ageIdx], midX, cy + (int)(4*scale), 0xFF000000);
+        cy += (int)(GAP * scale);
+        g.drawCenteredString(font, "Custom Skin", midX, cy - (int)(2*scale), 0xFF000000);
+        g.drawCenteredString(font, "Body Type " + (bodyTypeIdx+1), midX, cy + (int)(8*scale), 0xFF000000);
+        cy += (int)((GAP + 28) * scale);
+        g.drawCenteredString(font, "Nose " + (noseIdx + 1), midX, cy + (int)(4*scale), 0xFF000000);
+        cy += (int)(GAP * scale);
+        g.drawCenteredString(font, "Mouth " + (mouthIdx + 1), midX, cy + (int)(4*scale), 0xFF000000);
+        cy += (int)(GAP * scale);
+        g.drawCenteredString(font, "Eyes " + (eyeIdx + 1), midX, cy + (int)(4*scale), 0xFF000000);
     }
 
     private void drawPreview(GuiGraphics g) {
         if (minecraft == null || minecraft.player == null) return;
-
+        
         String raceId = RACE_DEFS[raceIdx][0];
         minecraft.player.getPersistentData().putString("dbi:race", raceId);
-
+        
         double sc = minecraft.getWindow().getGuiScale();
-        int wh    = minecraft.getWindow().getHeight();
+        int wh = minecraft.getWindow().getHeight();
         com.mojang.blaze3d.platform.GlStateManager._enableScissorTest();
         com.mojang.blaze3d.platform.GlStateManager._scissorBox(
             (int)(prX*sc), (int)(wh - (prY+prH)*sc), (int)(prW*sc), (int)(prH*sc)
         );
-
+        
         int entityScale = (int)(prH / 2.2f);
         int centerX = prX + prW / 2;
         int centerY = prY + prH - (int)(prH * 0.12f);
-
+        
         InventoryScreen.renderEntityInInventoryFollowsMouse(
             g, centerX, centerY, entityScale,
-            (float)centerX - (centerX + previewYaw  * 2.5f),
+            (float)centerX - (centerX + previewYaw * 2.5f),
             (float)centerY - (centerY + previewPitch * 2.5f),
             minecraft.player
         );
-
+        
         com.mojang.blaze3d.platform.GlStateManager._disableScissorTest();
     }
 
@@ -309,8 +361,8 @@ public class CharacterScreen extends Screen {
     @Override
     public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
         if (dragging) {
-            previewYaw  = clamp(previewYaw  +(float)(mx-lastDragX)*0.8f, -MAX_YAW,  MAX_YAW);
-            previewPitch= clamp(previewPitch+(float)(my-lastDragY)*0.4f, -MAX_PITCH, MAX_PITCH);
+            previewYaw = clamp(previewYaw + (float)(mx-lastDragX)*0.8f, -MAX_YAW, MAX_YAW);
+            previewPitch = clamp(previewPitch + (float)(my-lastDragY)*0.4f, -MAX_PITCH, MAX_PITCH);
             lastDragX=mx;
             lastDragY=my;
             return true;
@@ -340,7 +392,7 @@ public class CharacterScreen extends Screen {
 
     private void openPicker(String tgt) {
         pickerTarget = tgt;
-        showPicker   = true;
+        showPicker = true;
         px = width/2 - (PW+SW+16)/2;
         py = height/2 - PH/2;
         sx = px+PW+6;
@@ -428,38 +480,38 @@ public class CharacterScreen extends Screen {
         float p=v*(1-s);
         float q=v*(1-f*s);
         float t=v*(1-(1-f)*s);
-        float r=0, g=0, b=0;
+        float r=0, gb=0, b=0;
         if (hi == 0) {
-            r=v; g=t; b=p;
+            r=v; gb=t; b=p;
         } else if (hi == 1) {
-            r=q; g=v; b=p;
+            r=q; gb=v; b=p;
         } else if (hi == 2) {
-            r=p; g=v; b=t;
+            r=p; gb=v; b=t;
         } else if (hi == 3) {
-            r=p; g=q; b=v;
+            r=p; gb=q; b=v;
         } else if (hi == 4) {
-            r=t; g=p; b=v;
+            r=t; gb=p; b=v;
         } else {
-            r=v; g=p; b=q;
+            r=v; gb=p; b=q;
         }
-        return (Math.round(r*255)<<16)|(Math.round(g*255)<<8)|Math.round(b*255);
+        return (Math.round(r*255)<<16)|(Math.round(gb*255)<<8)|Math.round(b*255);
     }
 
     private float[] rgb2hsv(int rgb) {
         float r=((rgb>>16)&0xFF)/255f;
-        float g=((rgb>>8)&0xFF)/255f;
+        float gr=((rgb>>8)&0xFF)/255f;
         float b=(rgb&0xFF)/255f;
-        float mx=Math.max(r,Math.max(g,b));
-        float mn=Math.min(r,Math.min(g,b));
+        float mx=Math.max(r,Math.max(gr,b));
+        float mn=Math.min(r,Math.min(gr,b));
         float d=mx-mn;
         float h=0;
         if (d != 0) {
             if (mx == r) {
-                h=60f*((g-b)/d%6f);
-            } else if (mx == g) {
+                h=60f*((gr-b)/d%6f);
+            } else if (mx == gr) {
                 h=60f*((b-r)/d+2f);
             } else {
-                h=60f*((r-g)/d+4f);
+                h=60f*((r-gr)/d+4f);
             }
         }
         if (h < 0) h += 360f;

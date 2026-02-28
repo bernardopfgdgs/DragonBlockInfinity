@@ -2,10 +2,9 @@ package com.bernardo.dbi.network;
 
 import com.bernardo.dbi.Dbi;
 import com.bernardo.dbi.network.packet.RaceSelectionPacket;
+import com.bernardo.dbi.network.packet.SyncRaceCapPacket;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class ModNetwork {
@@ -20,17 +19,21 @@ public class ModNetwork {
         PROTOCOL::equals
     );
 
-    public static void register(IEventBus modEventBus) {
-        CHANNEL.registerMessage(
-            id++,
+    public static void register() {
+        CHANNEL.registerMessage(id++,
             RaceSelectionPacket.class,
             RaceSelectionPacket::encode,
             RaceSelectionPacket::decode,
             RaceSelectionPacket::handle
         );
+        CHANNEL.registerMessage(id++,
+            SyncRaceCapPacket.class,
+            SyncRaceCapPacket::encode,
+            SyncRaceCapPacket::decode,
+            SyncRaceCapPacket::handle
+        );
     }
 
-    /** Envia um pacote do cliente para o servidor. */
     public static <T> void sendToServer(T packet) {
         CHANNEL.sendToServer(packet);
     }
