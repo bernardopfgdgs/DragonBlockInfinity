@@ -1,0 +1,33 @@
+{
+  "icons_btn.png": [
+    {"name":"Barra Branca Superior","x":0,"y":0,"width":512,"height":30},
+    {"name":"Botão Seta Esq. (Amarelo)","x":0,"y":30,"width":28,"height":28},
+    {"name":"Botão Seta Dir. (Amarelo)","x":30,"y":30,"width":28,"height":28},
+    {"name":"Seta Simples Esq. (Amarelo)","x":60,"y":30,"width":18,"height":18},
+    {"name":"Seta Simples Dir. (Amarelo)","x":80,"y":30,"width":18,"height":18},
+    {"name":"Seta Cima (Amarelo)","x":100,"y":30,"width":18,"height":18},
+    {"name":"Seta Baixo (Amarelo)","x":120,"y":30,"width":18,"height":18},
+    {"name":"Seta Dupla Esq. (Amarelo)","x":140,"y":30,"width":18,"height":18},
+    {"name":"Seta Dupla Dir. (Amarelo)","x":160,"y":30,"width":18,"height":18},
+    {"name":"Botão 'X' (Amarelo)","x":180,"y":30,"width":28,"height":28},
+    {"name":"Botão 'Losango' (Amarelo)","x":210,"y":30,"width":28,"height":28},
+    {"name":"Botão 'O' (Amarelo)","x":240,"y":30,"width":18,"height":18},
+    {"name":"Botão 'I' (Amarelo)","x":260,"y":30,"width":18,"height":18},
+    {"name":"Botão 'II' (Amarelo)","x":280,"y":30,"width":18,"height":18},
+    {"name":"Botão Seta Esq. (Bege)","x":0,"y":60,"width":28,"height":28},
+    {"name":"Botão Seta Dir. (Bege)","x":30,"y":60,"width":28,"height":28},
+    {"name":"Botão '+' (Vermelho)","x":0,"y":92,"width":16,"height":16},
+    {"name":"Botão '-' (Vermelho)","x":20,"y":92,"width":16,"height":16},
+    {"name":"Botão '+' (Azul)","x":0,"y":112,"width":16,"height":16},
+    {"name":"Botão '-' (Azul)","x":20,"y":112,"width":16,"height":16}
+  ],
+  "life.png": [
+    {"name":"Barra Azul (Cheia)","x":0,"y":14,"width":160,"height":483},
+    {"name":"Barra Vermelha/Amarela","x":177,"y":14,"width":159,"height":483},
+    {"name":"Barra Vazia (Contorno)","x":353,"y":14,"width":159,"height":483},
+    {"name":"Detalhe Vertical","x":458,"y":102,"width":24,"height":348}
+  ],
+  "menu.png": [
+    {"name":"Painel Principal Azul","x":0,"y":0,"width":512,"height":318}
+  ]
+}
