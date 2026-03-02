@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview de imagens</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#0f1720;--muted:#bfc9d9}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial;background:var(--bg);color:#fff}
+    .container{display:flex;height:100%}
+    .sidebar{width:280px;background:var(--panel);padding:12px;box-sizing:border-box;overflow:auto}
+    .main{flex:1;display:flex;flex-direction:column}
+    .top{padding:12px;display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.03)}
+    .meta{font-size:13px;color:var(--muted)}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .viewer{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;background:#06080a}
+    .imgbox{display:inline-block;padding:20px}
+    .imgbox{position:relative}
+    .hotspot{position:absolute;width:40px;height:40px;border-radius:8px;background:rgba(31,111,235,0.14);display:flex;align-items:center;justify-content:center;border:1px solid rgba(31,111,235,0.28);transform:translate(-50%,-50%);cursor:pointer}
+    .hotspot img{width:28px;height:28px;object-fit:contain}
+    img{display:block;max-width:none;image-rendering:optimizeQuality;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+    .thumb{width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.06)}
+    .item{display:flex;gap:10px;align-items:center;padding:8px;border-radius:6px;cursor:pointer}
+    .item:hover{background:rgba(255,255,255,0.02)}
+    .item.active{background:linear-gradient(90deg,rgba(31,111,235,0.12),transparent)}
+    .name{font-size:13px}
+    .small{font-size:12px;color:var(--muted)}
+    .button{background:#1f6feb;color:#fff;padding:6px 10px;border-radius:6px;text-decoration:none;border:0}
+    input[type=range]{width:160px}
+    .sidebar .section{margin-bottom:12px}
+    .meta-block{margin-top:8px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <h3 style="margin:0 0 8px 0">Menu de imagens</h3>
+      <div class="section" id="list">
+        <!-- items populated by JS -->
+      </div>
+      <div class="section">
+        <strong>Miniatura</strong>
+        <div class="meta-block" id="thumbInfo">Selecione uma imagem</div>
+      </div>
+      <div class="section">
+          <strong>Hotspots</strong>
+          <div style="margin-top:8px;display:flex;gap:8px"><button id="toggleEdit" class="button">Editar Hotspots</button><button id="exportBtn" class="button">Exportar JSON</button></div>
+          <div style="margin-top:8px"><label class="small">Imagem alvo:</label>
+            <select id="targetImg" style="width:100%;margin-top:6px;padding:6px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.04)"></select>
+          </div>
+          <div id="hotspotList" class="meta-block">Nenhum</div>
+      </div>
+        <div class="section">
+          <strong>Importar coordenadas</strong>
+          <div class="meta-block">
+            Cole aqui as tabelas (use ` | ` como separador) e clique em <strong>Importar</strong>.
+            <textarea id="coords" placeholder="Cole as linhas da tabela aqui" style="width:100%;height:140px;margin-top:8px;background:#081018;color:#fff;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:6px"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px"><button id="importBtn" class="button">Importar</button><button id="clearBtn" class="button">Limpar</button></div>
+          </div>
+        </div>
+      <div class="section">
+        <strong>Metadata</strong>
+        <pre id="metadata" class="meta-block">—</pre>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="top">
+        <div><strong id="title">Preview</strong><div class="meta" id="subtitle">Selecione uma imagem à esquerda</div></div>
+        <div class="controls">
+          <label style="color:var(--muted)">Zoom <input id="zoom" type="range" min="10" max="400" value="100"> <span id="zoomval">100%</span></label>
+          <button id="fitbtn" class="button">Ajustar</button>
+          <a id="dl" class="button" href="#" download>Baixar</a>
+        </div>
+      </div>
+
+      <div class="viewer" id="viewer">
+        <div class="imgbox" id="imgbox"><img id="img" src="" alt="preview"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const images = [
+      {id:'img1', src:'imagem_decodificada.png', name:'imagem_decodificada.png'},
+      {id:'img2', src:'icons_btn.png', name:'icons_btn.png'}
+    ];
+
+    const list = document.getElementById('list');
+    const img = document.getElementById('img');
+    const title = document.getElementById('title');
+    const subtitle = document.getElementById('subtitle');
+    const metadata = document.getElementById('metadata');
+    const thumbInfo = document.getElementById('thumbInfo');
+    const dl = document.getElementById('dl');
+    const zoom = document.getElementById('zoom');
+    const zoomval = document.getElementById('zoomval');
+    const fitbtn = document.getElementById('fitbtn');
+    let naturalW=0, naturalH=0, fit=false, current=null;
+
+    function makeItem(it){
+      const el = document.createElement('div'); el.className='item'; el.dataset.src=it.src; el.dataset.name=it.name;
+      const t = document.createElement('img'); t.className='thumb'; t.src=it.src; t.alt=it.name;
+      const d = document.createElement('div'); d.innerHTML=`<div class=\"name\">${it.name}</div><div class=\"small\">PNG</div>`;
+      el.appendChild(t); el.appendChild(d);
+      el.addEventListener('click', ()=>{ selectImage(it.src,it.name,el); });
+      return el;
+    }
+
+    images.forEach(i=> list.appendChild(makeItem(i)));
+    // populate target image select
+    const targetImg = document.getElementById('targetImg');
+    images.forEach(i=>{ const o=document.createElement('option'); o.value=i.src; o.textContent=i.name; targetImg.appendChild(o); });
+
+    function selectImage(src,name,el){
+      // mark active
+      Array.from(list.children).forEach(c=>c.classList.remove('active'));
+      if(el) el.classList.add('active');
+      current = {src,name};
+      img.src = src;
+      title.textContent = name;
+      subtitle.textContent = src;
+      dl.href = src; dl.download = name;
+      thumbInfo.textContent = 'Carregando...';
+      metadata.textContent = '—';
+      fit=false; zoom.value=100; zoomval.textContent='100%';
+      renderHotspots();
+    }
+
+    img.addEventListener('load', ()=>{
+      naturalW = img.naturalWidth; naturalH = img.naturalHeight;
+      thumbInfo.textContent = `${naturalW}×${naturalH}`;
+      metadata.textContent = `Formato: PNG\nDimensões: ${naturalW}×${naturalH}\nTamanho do arquivo: (veja download)`;
+      applyZoom();
+    });
+
+    function applyZoom(){
+      if(fit){
+        img.style.width='100%'; img.style.height='auto'; zoomval.textContent='Ajustado';
+      } else {
+        const s = zoom.value/100; img.style.width = Math.round(naturalW * s) + 'px'; img.style.height='auto'; zoomval.textContent = zoom.value+'%';
+      }
+    }
+
+    // Hotspot editor
+    let editMode = false;
+    const toggleEdit = document.getElementById('toggleEdit');
+    const hotspotList = document.getElementById('hotspotList');
+    const imgbox = document.getElementById('imgbox');
+    const exportBtn = document.getElementById('exportBtn');
+    let hotspots = [];
+
+    toggleEdit.addEventListener('click', ()=>{
+      editMode = !editMode;
+      toggleEdit.textContent = editMode ? 'Saindo do modo edição' : 'Editar Hotspots';
+      img.style.cursor = editMode ? 'crosshair' : 'default';
+    });
+
+    // add hotspot by clicking on displayed image
+    imgbox.addEventListener('click', (e)=>{
+      if(!editMode) return;
+      const rect = img.getBoundingClientRect();
+      const cx = e.clientX - rect.left; const cy = e.clientY - rect.top;
+      const xPct = (cx / rect.width) * 100;
+      const yPct = (cy / rect.height) * 100;
+      const hs = {id:Date.now(), x:xPct.toFixed(2), y:yPct.toFixed(2), icon:'icons_btn.png', label:`btn_${hotspots.length+1}`};
+      hotspots.push(hs);
+      renderHotspots();
+      updateHotspotList();
+    });
+
+    function renderHotspots(){
+      // remove existing
+      Array.from(imgbox.querySelectorAll('.hotspot')).forEach(n=>n.remove());
+      hotspots.forEach(h=>{
+        const el = document.createElement('div'); el.className='hotspot'; el.style.left = h.x+'%'; el.style.top = h.y+'%'; el.title = h.label;
+        const ic = document.createElement('img'); ic.src = h.icon; ic.alt = h.label;
+        el.appendChild(ic);
+        el.addEventListener('click', (ev)=>{ ev.stopPropagation(); if(!editMode) alert('Hotspot: '+h.label+' — ('+h.x+','+h.y+')'); else { if(confirm('Remover hotspot '+h.label+'?')){hotspots = hotspots.filter(x=>x.id!==h.id); renderHotspots(); updateHotspotList();}} });
+        imgbox.appendChild(el);
+      });
+    }
+
+    function updateHotspotList(){
+      if(hotspots.length===0) hotspotList.textContent='Nenhum';
+      else hotspotList.innerHTML = hotspots.map(h=>`- ${h.label}: ${h.x}% , ${h.y}%`).join('\n');
+    }
+
+    exportBtn.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(hotspots,null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = (current?current.name.replace(/\.[^.]+$/,''):'hotspots')+'_hotspots.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // Import coords parser
+    const importBtn = document.getElementById('importBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const coordsTa = document.getElementById('coords');
+
+    clearBtn.addEventListener('click', ()=>{ coordsTa.value=''; });
+
+    importBtn.addEventListener('click', ()=>{
+      const raw = coordsTa.value;
+      if(!raw.trim()){ alert('Cole as coordenadas no campo antes de importar.'); return; }
+      const rows = raw.split('\n');
+      const parsed = [];
+      for(let r of rows){
+        if(!r.includes('|')) continue;
+        const parts = r.split('|').map(s=>s.trim()).filter(s=>s.length>0);
+        if(parts.length<5) continue;
+        // find numeric columns (X Y Width Height) - try to find last 4 numeric tokens
+        const nums = parts.slice(-4).map(s=>s.replace(/[^0-9.\-]/g,''));
+        if(nums.some(n=>n==='')) continue;
+        const label = parts[0];
+        const x = Number(nums[0]), y = Number(nums[1]), w = Number(nums[2]), h = Number(nums[3]);
+        parsed.push({label,x,y,w,h});
+      }
+      if(parsed.length===0){ alert('Nenhuma linha válida encontrada. Verifique o formato.'); return; }
+
+      // ensure correct target image selected
+      const target = targetImg.value || images[0].src;
+      // switch view to target image
+      const listChild = Array.from(list.children).find(c=>c.dataset.src===target);
+      if(listChild) listChild.click();
+
+      // wait for image to load to get natural size
+      img.addEventListener('load', function once(){
+        img.removeEventListener('load', once);
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        for(let p of parsed){
+          // compute center of the element and convert to % of image
+          const cx = p.x + p.w/2;
+          const cy = p.y + p.h/2;
+          const xPct = (cx/iw)*100; const yPct = (cy/ih)*100;
+          hotspots.push({id:Date.now()+Math.random(), x:xPct.toFixed(2), y:yPct.toFixed(2), icon:target, label:p.label, w:p.w, h:p.h});
+        }
+        renderHotspots(); updateHotspotList();
+      });
+      // if already loaded, trigger handler manually
+      if(img.complete && img.naturalWidth>0){ img.dispatchEvent(new Event('load')); }
+    });
+
+    // re-render hotspots when window resizes (image may scale)
+    window.addEventListener('resize', ()=>{ applyZoom(); renderHotspots(); });
+
+    zoom.addEventListener('input', ()=>{ fit=false; applyZoom(); });
+    fitbtn.addEventListener('click', ()=>{ fit=!fit; fitbtn.textContent = fit ? 'Real' : 'Ajustar'; applyZoom(); });
+
+    // keyboard shortcuts: 1/2 select, +/- zoom
+    window.addEventListener('keydown', (e)=>{
+      if(e.key==='1') list.children[0].click();
+      if(e.key==='2' && list.children[1]) list.children[1].click();
+      if(e.key==='+'||e.key==='='){ zoom.value = Math.min(400, Number(zoom.value)+10); fit=false; applyZoom(); }
+      if(e.key==='-'){ zoom.value = Math.max(10, Number(zoom.value)-10); fit=false; applyZoom(); }
+    });
+
+    // initial select
+    list.children[0].click();
+  </script>
+</body>
+</html>
